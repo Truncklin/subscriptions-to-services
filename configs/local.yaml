@@ -1,0 +1,6 @@
+env: localhost
+storage_path: ./data/subscriptions_to_services.db
+http_server:
+  host: localhost:8080
+  timeout: 10s
+  idle_timeout: 60s
