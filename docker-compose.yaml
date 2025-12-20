@@ -1,0 +1,35 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    container_name: db
+    environment:
+      POSTGRES_USER: prsvc
+      POSTGRES_PASSWORD: prsvcpass123
+      POSTGRES_DB: db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prsvc -d db"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: subservices_app
+    environment:
+      CONFIG_PATH: /src/configs/local.yaml
+    volumes:
+      - ./configs/local.yaml:/src/configs/local.yaml:ro
+      - ./internal/storage/migrations:/migrations:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

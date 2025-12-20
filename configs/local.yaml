@@ -1,5 +1,5 @@
 env: localhost
-storage_path: ./data/subscriptions_to_services.db
+storage_path: "postgres://prsvc:prsvcpass123@db:5432/db?sslmode=disable"
 http_server:
   host: localhost:8080
   timeout: 10s
