@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -22,13 +23,21 @@ func NewHandler(pool *pgxpool.Pool) *Handler {
 	return &Handler{DB: pool}
 }
 
-type Subscription struct {
-	ID          string  `json:"id"`
-	UserID      string  `json:"user_id"`
+type SubscriptionCreateRequest struct {
 	ServiceName string  `json:"service_name"`
 	Price       int     `json:"price"`
-	StartDate   string  `json:"start_date"`
+	UserID      string  `json:"user_id"`
+	StartDate   string  `json:"start_date"` // "07-2025"
 	EndDate     *string `json:"end_date,omitempty"`
+}
+
+type Subscription struct {
+	ID          string     `json:"id"`
+	UserID      string     `json:"user_id"`
+	ServiceName string     `json:"service_name"`
+	Price       int        `json:"price"`
+	StartDate   time.Time  `json:"start_date"`
+	EndDate     *time.Time `json:"end_date,omitempty"`
 }
 
 func Health(w http.ResponseWriter, r *http.Request) {
@@ -40,25 +49,28 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	var s Subscription
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+	var req SubscriptionCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	s, err := req.ToModel()
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	id := uuid.New().String()
-	s.ID = id
-
 	query := `INSERT INTO subscriptions (id, user_id, service_name, price, start_date, end_date)
 		VALUES ($1, $2, $3, $4, $5, $6)`
-	_, err := h.DB.Exec(ctx, query, s.ID, s.UserID, s.ServiceName, s.Price, s.StartDate, s.EndDate)
+	_, err = h.DB.Exec(ctx, query, s.ID, s.UserID, s.ServiceName, s.Price, s.StartDate, s.EndDate)
 	if err != nil {
 		slog.Error("Failed to insert subscription",
 			slog.String("s.ID", s.ID),
 			slog.String("s.ServiceName", s.ServiceName),
 			slog.String("s.Price", strconv.Itoa(s.Price)),
 			slog.String("s.UserID", s.UserID),
-			slog.String("s.StartDate", s.StartDate),
+
 			slog.Any("s.EndDate", &s.EndDate),
 			slog.Any("error", err))
 
@@ -103,7 +115,6 @@ func (h *Handler) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// UpdateSubscription — PUT /subscriptions/{id}
 func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -128,4 +139,40 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 
 	s.ID = id
 	json.NewEncoder(w).Encode(s)
+}
+
+/*func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+}*/
+
+func (r SubscriptionCreateRequest) ToModel() (*Subscription, error) {
+	start, err := parseMonth(r.StartDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start_date")
+	}
+
+	var end *time.Time
+	if r.EndDate != nil {
+		parsedEnd, err := parseMonth(*r.EndDate)
+		if err != nil {
+			return nil, fmt.Errorf("invalid end_date")
+		}
+		end = &parsedEnd
+	}
+
+	return &Subscription{
+		ID:          uuid.New().String(),
+		UserID:      r.UserID,
+		ServiceName: r.ServiceName,
+		Price:       r.Price,
+		StartDate:   start,
+		EndDate:     end,
+	}, nil
+}
+
+func parseMonth(v string) (time.Time, error) {
+
+	return time.Parse("01-2006", v)
 }
