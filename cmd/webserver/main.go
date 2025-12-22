@@ -15,6 +15,11 @@ import (
 	"SubServices/internal/storage"
 )
 
+// @title SubServices API
+// @version 1.0
+// @description API для управления подписками
+// @host localhost:8080
+// @BasePath /api
 func main() {
 	slogInit()
 

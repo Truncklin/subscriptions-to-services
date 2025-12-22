@@ -5,7 +5,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger"
 
+	_ "SubServices/cmd/webserver/docs"
 	"SubServices/internal/http/handlers"
 )
 
@@ -18,6 +20,8 @@ func InitRouter(h *handlers.Handler) *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
+
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", handlers.Health)
 		r.Route("/subscriptions", func(r chi.Router) {
@@ -25,7 +29,7 @@ func InitRouter(h *handlers.Handler) *chi.Mux {
 			r.Get("/{id}", h.GetSubscription)
 			r.Put("/{id}", h.UpdateSubscription)
 			r.Delete("/{id}", h.DeleteSubscription)
-			//r.Get("/", h.ListSubscriptions)
+			r.Get("/", h.ListSubscriptions)
 		})
 	})
 

@@ -45,6 +45,17 @@ func Health(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
+// CreateSubscription godoc
+// @Summary Создать подписку
+// @Description Создаёт новую подписку. start_date и end_date передаются в формате MM-YYYY
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param subscription body SubscriptionCreateRequest true "Данные подписки"
+// @Success 201 {object} map[string]string
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /subscriptions [post]
 func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -82,6 +93,15 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"id": s.ID})
 }
 
+// GetSubscription godoc
+// @Summary Получить подписку
+// @Description Возвращает подписку по ID
+// @Tags subscriptions
+// @Produce json
+// @Param id path string true "ID подписки"
+// @Success 200 {object} Subscription
+// @Failure 404 {string} string
+// @Router /subscriptions/{id} [get]
 func (h *Handler) GetSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -100,6 +120,14 @@ func (h *Handler) GetSubscription(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(s)
 }
 
+// DeleteSubscription godoc
+// @Summary Удалить подписку
+// @Description Удаляет подписку по ID
+// @Tags subscriptions
+// @Param id path string true "ID подписки"
+// @Success 204
+// @Failure 404 {string} string
+// @Router /subscriptions/{id} [delete]
 func (h *Handler) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -115,6 +143,18 @@ func (h *Handler) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// UpdateSubscription godoc
+// @Summary Обновить подписку
+// @Description Полностью обновляет подписку по ID
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param id path string true "ID подписки"
+// @Param subscription body SubscriptionUpdateRequest true "Данные подписки"
+// @Success 200 {object} Subscription
+// @Failure 400 {string} string
+// @Failure 404 {string} string
+// @Router /subscriptions/{id} [put]
 func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -122,6 +162,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var s Subscription
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+		slog.Error("Failed to update subscription", slog.Any("error", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -133,6 +174,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	`
 	tag, err := h.DB.Exec(ctx, query, s.ServiceName, s.Price, s.UserID, s.StartDate, s.EndDate, id)
 	if err != nil || tag.RowsAffected() == 0 {
+		slog.Error("Failed to update subscription", slog.Any("error", err))
 		http.Error(w, "Subscription not found", http.StatusNotFound)
 		return
 	}
@@ -141,11 +183,92 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(s)
 }
 
-/*func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+// ListSubscriptions godoc
+// @Summary Получить подписки за период
+// @Description Фильтрация по периоду
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param from query string false "Начало периода (MM-YYYY)"
+// @Param to query string false "Конец периода (MM-YYYY)"
+// @Success 200 {array} Subscription
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /subscriptions [get]
+func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-}*/
+	q := r.URL.Query()
+
+	var (
+		from *time.Time
+		to   *time.Time
+	)
+
+	if v := q.Get("from"); v != "" {
+		t, err := parseMonth(v)
+		if err != nil {
+			http.Error(w, "invalid from", http.StatusBadRequest)
+			return
+		}
+		from = &t
+	}
+
+	if v := q.Get("to"); v != "" {
+		t, err := parseMonth(v)
+		if err != nil {
+			http.Error(w, "invalid to", http.StatusBadRequest)
+			return
+		}
+		to = &t
+	}
+
+	query := `
+		SELECT id, service_name, price, user_id, start_date, end_date
+		FROM subscriptions
+		WHERE
+		    ($1::timestamp IS NULL OR start_date >= $1)
+		AND ($2::timestamp IS NULL OR end_date <= $2)
+		`
+
+	rows, err := h.DB.Query(ctx, query, from, to)
+	if err != nil {
+		slog.Error("query failed", slog.Any("error", err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var result []Subscription
+
+	for rows.Next() {
+		var s Subscription
+		err := rows.Scan(
+			&s.ID,
+			&s.ServiceName,
+			&s.Price,
+			&s.UserID,
+			&s.StartDate,
+			&s.EndDate,
+		)
+		if err != nil {
+			slog.Error("scan failed", slog.Any("error", err))
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		result = append(result, s)
+	}
+
+	if err := rows.Err(); err != nil {
+		slog.Error("rows error", slog.Any("error", err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
 
 func (r SubscriptionCreateRequest) ToModel() (*Subscription, error) {
 	start, err := parseMonth(r.StartDate)
