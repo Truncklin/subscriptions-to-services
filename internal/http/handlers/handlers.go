@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -27,7 +26,15 @@ type SubscriptionCreateRequest struct {
 	ServiceName string  `json:"service_name"`
 	Price       int     `json:"price"`
 	UserID      string  `json:"user_id"`
-	StartDate   string  `json:"start_date"` // "07-2025"
+	StartDate   string  `json:"start_date"`
+	EndDate     *string `json:"end_date,omitempty"`
+}
+
+type SubscriptionUpdateRequest struct {
+	ServiceName string  `json:"service_name"`
+	Price       int     `json:"price"`
+	UserID      string  `json:"user_id"`
+	StartDate   string  `json:"start_date"`
 	EndDate     *string `json:"end_date,omitempty"`
 }
 
@@ -120,8 +127,15 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	id := chi.URLParam(r, "id")
-	var s Subscription
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+
+	var req SubscriptionUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	s, err := req.ToModel(id)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -137,7 +151,6 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.ID = id
 	json.NewEncoder(w).Encode(s)
 }
 
@@ -148,16 +161,17 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 }*/
 
 func (r SubscriptionCreateRequest) ToModel() (*Subscription, error) {
+
 	start, err := parseMonth(r.StartDate)
 	if err != nil {
-		return nil, fmt.Errorf("invalid start_date")
+		return nil, err
 	}
 
 	var end *time.Time
 	if r.EndDate != nil {
 		parsedEnd, err := parseMonth(*r.EndDate)
 		if err != nil {
-			return nil, fmt.Errorf("invalid end_date")
+			return nil, err
 		}
 		end = &parsedEnd
 	}
@@ -172,6 +186,31 @@ func (r SubscriptionCreateRequest) ToModel() (*Subscription, error) {
 	}, nil
 }
 
+func (r SubscriptionUpdateRequest) ToModel(id string) (*Subscription, error) {
+
+	start, err := parseMonth(r.StartDate)
+	if err != nil {
+		return nil, err
+	}
+
+	var end *time.Time
+	if r.EndDate != nil {
+		parsedEnd, err := parseMonth(*r.EndDate)
+		if err != nil {
+			return nil, err
+		}
+		end = &parsedEnd
+	}
+
+	return &Subscription{
+		ID:          id,
+		UserID:      r.UserID,
+		ServiceName: r.ServiceName,
+		Price:       r.Price,
+		StartDate:   start,
+		EndDate:     end,
+	}, nil
+}
 func parseMonth(v string) (time.Time, error) {
 
 	return time.Parse("01-2006", v)
