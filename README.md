@@ -137,10 +137,18 @@ http://localhost:8080/swagger/index.html
 └── README.md
 ```
 
-🛠 Миграции
+##🛠 Миграции
 
 Миграции находятся в папке:
 ```
 internal/storage/migrations/
 ```
 Они создают таблицу subscriptions и нужные индексы.
+
+
+## Тестирование Postman
+
+ссылка на рабочее пространство для тестирования сервиса
+
+https://truncklin-5709688.postman.co/workspace/Georgy's-Workspace~82e765f4-7467-4941-84e8-1ff6525c76e0/collection/50290125-d904cc10-7cfb-400f-badf-bbd43b275f04?action=share&creator=50290125&active-environment=50290125-8cd0a7ca-a5ff-48de-9a9b-fa115ca6a44f
+
