@@ -24,7 +24,19 @@ definitions:
       service_name:
         type: string
       start_date:
-        description: '"07-2025"'
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.SubscriptionUpdateRequest:
+    properties:
+      end_date:
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
         type: string
       user_id:
         type: string
@@ -153,12 +165,12 @@ paths:
         name: id
         required: true
         type: string
-      - description: Новые данные подписки
+      - description: Данные подписки
         in: body
         name: subscription
         required: true
         schema:
-          $ref: '#/definitions/handlers.Subscription'
+          $ref: '#/definitions/handlers.SubscriptionUpdateRequest'
       produces:
       - application/json
       responses:

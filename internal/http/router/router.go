@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	httpSwagger "github.com/swaggo/http-swagger"
 
-	_ "SubServices/cmd/webserver/docs"
+	_ "SubServices/docs"
 	"SubServices/internal/http/handlers"
 )
 

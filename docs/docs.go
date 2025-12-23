@@ -169,12 +169,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Новые данные подписки",
+                        "description": "Данные подписки",
                         "name": "subscription",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.Subscription"
+                            "$ref": "#/definitions/handlers.SubscriptionUpdateRequest"
                         }
                     }
                 ],
@@ -265,7 +265,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "start_date": {
-                    "description": "\"07-2025\"",
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.SubscriptionUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "end_date": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "service_name": {
+                    "type": "string"
+                },
+                "start_date": {
                     "type": "string"
                 },
                 "user_id": {
